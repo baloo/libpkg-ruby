@@ -226,7 +226,7 @@ module Pkg
       raise "NULL pointer for db pointer" if @db_pointer.null?
 
       # set destructor
-      ObjectSpace.define_finalizer @db_pointer, Search.finalize
+      ObjectSpace.define_finalizer @db_pointer, proc { Search.finalize(@db_pointer) }
     end
 
     def self.finalize(ptr)
