@@ -100,6 +100,9 @@ module Pkg
 
   attach_function :pkgdb_open, [:pointer, DbType], :int
 
+  # void pkgdb_close(struct pkgdb *db);
+  attach_function :pkgdb_close, [:pointer], :void
+
   # Args: 
   #   struct pkgdb *db, const char *pattern, match_t match, unsigned int field, const char * reponame
   # Return:
@@ -110,6 +113,9 @@ module Pkg
   # int
   # pkgdb_it_next(struct pkgdb_it *it, struct pkg **pkg_p, int flags)
   attach_function :pkgdb_it_next, [:pointer, :pointer, :int], :int
+
+  # void pkgdb_it_free(struct pkgdb_it *);
+  attach_function :pkgdb_it_free, [:pointer], :void
 
   attach_function "pkg_get2", [:pointer, :varargs], :int
 
@@ -212,15 +218,19 @@ module Pkg
       ::Pkg::Pkg.init()
 
       db_ptr_ptr = FFI::MemoryPointer.new(:pointer)
-
       res = ::Pkg.pkgdb_open(db_ptr_ptr, db_type)
 
-      if res != Epkg[:ok]
-        raise "pkgdb_open failed: #{res}"
-      end
+      raise "pkgdb_open failed: #{res}" if res != Epkg[:ok]
 
       @db_pointer = db_ptr_ptr.read_pointer()
       raise "NULL pointer for db pointer" if @db_pointer.null?
+
+      # set destructor
+      ObjectSpace.define_finalizer @db_pointer, Search.finalize
+    end
+
+    def self.finalize(ptr)
+      ::Pkg.pkgdb_close(ptr)
     end
 
     SEARCH_DEFAULT = {
@@ -233,19 +243,22 @@ module Pkg
     def search(pattern, opts={})
       options = SEARCH_DEFAULT.merge(opts)
 
-      it_ptr = ::Pkg.pkgdb_search(@db_pointer, pattern, options[:match], options[:field], options[:reponame])
-
-      # no results
-      raise "Search returned NULL" if it_ptr.null?
-
-      pkg_ptr = ::FFI::MemoryPointer.new(:pointer)
-
       ary = []
 
-      while((res = ::Pkg.pkgdb_it_next(it_ptr, pkg_ptr, PkgLoad::BASIC)) == Epkg[:ok]) do
-        pkg = pkg_ptr.read_pointer()
+      begin
+        it_ptr = ::Pkg.pkgdb_search(@db_pointer, pattern, options[:match], options[:field], options[:reponame])
+        # no results
+        raise "Search returned NULL" if it_ptr.null?
 
-        ary << Pkg.get_pkg(pkg, options[:return])
+        pkg_ptr = ::FFI::MemoryPointer.new(:pointer)
+
+        while((res = ::Pkg.pkgdb_it_next(it_ptr, pkg_ptr, PkgLoad::BASIC)) == Epkg[:ok]) do
+          pkg = pkg_ptr.read_pointer()
+          ary << Pkg.get_pkg(pkg, options[:return])
+        end
+      ensure
+        # Cleanup
+        ::Pkg.pkgdb_it_free(it_ptr)
       end
 
       ary
