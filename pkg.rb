@@ -73,6 +73,49 @@ module Pkg
         :single, 1
         )
 
+  PkgConfig = enum(
+        :repo, 0,
+        :dbdir, 1,
+        :cachedir, 2,
+        :portsdir, 3,
+        :repokey, 4,
+        :multirepos, 5,
+        :handle_rc_scripts, 6,
+        :assume_always_yes, 7,
+        :repos, 8,
+        :plist_keywords_dir, 9,
+        :syslog, 10,
+        :shlibs, 11,
+        :autodeps, 12,
+        :abi, 13,
+        :developer_mode, 14,
+        :portaudit_site, 15
+        )
+
+  ConfigKey = enum(
+        :repo, 0,
+        :dbdir, 1,
+        :cachedir, 2,
+        :portsdir, 3,
+        :repokey, 4,
+        :multirepos, 5,
+        :handle_rc_scripts, 6,
+        :assume_always_yes, 7,
+        :repos, 8,
+        :plist_keywords_dir, 9,
+        :syslog, 10,
+        :shlibs, 11,
+        :autodeps, 12,
+        :abi, 13,
+        :developer_mode, 14,
+        :portaudit_site, 15
+        )
+
+  KeyvalueType = enum(
+        :key,
+        :value
+        )
+
   class PkgLoad
     BASIC      = 0
     DEPS       = (1<<0)
@@ -120,6 +163,21 @@ module Pkg
 
   attach_function "pkg_get2", [:pointer, :varargs], :int
 
+  # int pkg_config_string(pkg_config_key key, const char **value);
+  attach_function :pkg_config_string, [ConfigKey, :pointer], :int
+
+  # int pkg_config_bool(pkg_config_key key, bool *value);
+  attach_function :pkg_config_bool, [ConfigKey, :pointer], :int
+
+  # pkg_config_list(pkg_config_key key, struct pkg_config_kv **kv);
+  attach_function :pkg_config_list, [ConfigKey, :pointer], :int
+
+  # const char *pkg_config_kv_get(struct pkg_config_kv *kv, pkg_config_kv_t type);
+  attach_function :pkg_config_kv_get, [:pointer, KeyvalueType], :string
+
+  # int pkg_update(const char *name, const char *packagesite);
+  attach_function :pkg_update, [:string, :string], :int
+
   class Pkg
     def self.init()
       if !defined?(@initialized)
@@ -153,7 +211,7 @@ module Pkg
       read(ptr, field, output) {|x| x.read_double()}
     end
     def self.read_bool(ptr, field, output)
-      read(ptr, field, output) {|x| (value_ptr.read_bytes(1) == 0x00)}
+      read(ptr, field, output) {|x| (value_ptr.read_bytes(1) == "\001")}
     end
     def self.read_license(ptr, field, output)
       read(ptr, field, output) {|x| License.from_native(value_ptr.read_byte(1))}
@@ -210,6 +268,59 @@ module Pkg
       end
 
       output
+    end
+  end
+
+  class Repo
+    def initialize(name, packagesite)
+      @name = name
+      @packagesite = packagesite
+    end
+
+    def update
+      res = ::Pkg.pkg_update(@name, @packagesite)
+
+      raise "Update failed with return code : #{res}" if res != Epkg[:ok] and res != Epkg[:uptodate]
+    end
+
+    def inspect
+      "#<Pkg::Repo #{@name} #{@packagesite}>"
+    end
+
+    def self.list
+      Pkg.init()
+
+      repos = []
+
+      # Check if we need multirepos or not
+      ptr = ::FFI::MemoryPointer.new(:bool)
+      res = ::Pkg.pkg_config_bool(PkgConfig[:multirepos], ptr)
+      raise "couldn't read config" if res != Epkg[:ok]
+
+      multirepos = (ptr.read_bytes(1) == "\001")
+
+      if multirepos
+        repokv_ptr_ptr = ::FFI::MemoryPointer.new(:pointer)
+
+        while (::Pkg.pkg_config_list(ConfigKey[:repos], repokv_ptr_ptr) == Epkg[:ok]) do
+          repokv_ptr = repokv_ptr_ptr.read_pointer()
+
+          name = ::Pkg.pkg_config_kv_get(repokv_ptr, KeyvalueType[:key])
+          packagesite = ::Pkg.pkg_config_kv_get(repokv_ptr, KeyvalueType[:value])
+
+          repos << Repo.new(name, packagesite)
+        end
+      else
+        ptr = ::FFI::MemoryPointer.new(:pointer)
+        res = ::Pkg.pkg_config_string(ConfigKey[:repo], ptr)
+        raise "couldn't read config" if res != Epkg[:ok]
+
+        packagesite_ptr = ptr.read_pointer()
+        raise "PACKAGESITE is not defined." if packagesite_ptr.null?
+
+        repos << Repo.new("repo", packagesite_ptr)
+      end
+      repos
     end
   end
 
