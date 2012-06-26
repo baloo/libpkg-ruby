@@ -97,6 +97,7 @@ module Pkg
   end
 
   attach_function :pkg_init, [:string], :int
+  attach_function :pkg_shutdown, [:void], :void
 
   attach_function :pkgdb_open, [:pointer, DbType], :int
 
@@ -121,42 +122,41 @@ module Pkg
 
   class Pkg
     def self.init()
-      @initialized ||= begin
+      if !defined?(@initialized)
         res = ::Pkg::pkg_init(nil)
         raise "pkg_init failed to initialize: #{res}" if res != 0
 
-        true
+        @initialized = true
+
+        # set destructor
+        ObjectSpace.define_finalizer self, proc { Pkg.finalize() }
       end
     end
 
-    def self.read_string(ptr, field, output)
-        value_ptr = ptr.read_pointer()
-        raise "NULL pointer for pkg value" if value_ptr.null?
-
-        value = value_ptr.read_string()
-        output[field] = value
+    def self.shutdown()
+      puts "shutdown"
+      ::Pkg::pkg_shutdown()
     end
 
-    def self.read_uint64(ptr, field, output)
-        value_ptr = ptr.read_pointer()
-        raise "NULL pointer for pkg value" if value_ptr.null?
+    def self.read(ptr, field, output, &block)
+      value_ptr = ptr.read_pointer()
+      raise "NULL pointer for pkg value" if value_ptr.null?
 
-        value = value_ptr.read_double()
-        output[field] = value
+      value = block.call value_ptr
+      output[field] = value
+    end
+
+    def self.read_string(ptr, field, output)
+      read(ptr, field, output) {|x| x.read_string()}
+    end
+    def self.read_uint64(ptr, field, output)
+      read(ptr, field, output) {|x| x.read_double()}
     end
     def self.read_bool(ptr, field, output)
-        value_ptr = ptr.read_pointer()
-        raise "NULL pointer for pkg value" if value_ptr.null?
-
-        value = (value_ptr.read_bytes(1) == 0x00)
-        output[field] = value
+      read(ptr, field, output) {|x| (value_ptr.read_bytes(1) == 0x00)}
     end
     def self.read_license(ptr, field, output)
-        value_ptr = ptr.read_pointer()
-        raise "NULL pointer for pkg value" if value_ptr.null?
-
-        value = License.from_native(value_ptr.read_byte(1))
-        output[field] = value
+      read(ptr, field, output) {|x| License.from_native(value_ptr.read_byte(1))}
     end
 
     def self.get_pkg(pkg, fields)
