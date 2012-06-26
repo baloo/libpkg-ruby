@@ -114,14 +114,13 @@ module Pkg
   attach_function "pkg_get2", [:pointer, :varargs], :int
 
   class Pkg
-    @@initiated = false
     def self.init()
-      return @@initiated if @@initiated
+      @initialized ||= begin
+        res = ::Pkg::pkg_init(nil)
+        raise "pkg_init failed to initialize: #{res}" if res != 0
 
-      res = ::Pkg::pkg_init(nil)
-      raise "pkg_init failed to initialize: #{res}" if res != 0
- 
-      @@initiated = true
+        true
+      end
     end
 
     def self.read_string(ptr, field, output)
@@ -224,8 +223,17 @@ module Pkg
       raise "NULL pointer for db pointer" if @db_pointer.null?
     end
 
-    def search(pattern, match = Match[:regex], field = Field[:name], reponame = "default")
-      it_ptr = ::Pkg.pkgdb_search(@db_pointer, pattern, match, field, reponame)
+    SEARCH_DEFAULT = {
+      :match => Match[:regex],
+      :field => Field[:name],
+      :reponame => "default",
+      :return => [:name]
+    }
+
+    def search(pattern, opts={})
+      options = SEARCH_DEFAULT.merge(opts)
+
+      it_ptr = ::Pkg.pkgdb_search(@db_pointer, pattern, options[:match], options[:field], options[:reponame])
 
       # no results
       raise "Search returned NULL" if it_ptr.null?
@@ -237,19 +245,7 @@ module Pkg
       while((res = ::Pkg.pkgdb_it_next(it_ptr, pkg_ptr, PkgLoad::BASIC)) == Epkg[:ok]) do
         pkg = pkg_ptr.read_pointer()
 
-        ary << Pkg.get_pkg(pkg, [:name])
-
-        #name_ptr_ptr = ::FFI::MemoryPointer.new(:pointer)
-
-        #::Pkg.pkg_get2(pkg, Attributes, Attributes[:name], :pointer, name_ptr_ptr)
-
-        #name_ptr = name_ptr_ptr.read_pointer()
-
-        #raise "NULL pointer for pkg name" if name_ptr.null?
-
-        #name = name_ptr.read_string()
-
-        #ary << name
+        ary << Pkg.get_pkg(pkg, options[:return])
       end
 
       ary
