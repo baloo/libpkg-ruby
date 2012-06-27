@@ -116,6 +116,167 @@ module Pkg
         :value
         )
 
+  EventType = enum(
+        :install_begin, 0,
+        :install_finished,
+        :deinstall_begin,
+        :deinstall_finished,
+        :upgrade_begin,
+        :upgrade_finished,
+        :fetching,
+        :integritycheck_begin,
+        :integritycheck_finished,
+        :newpkgversion,
+
+        :error,
+        :errno,
+        :archive_comp_unsup, 65536,
+        :already_installed,
+        :failed_cksum,
+        :create_db_error,
+        :required,
+        :missing_dep,
+        :noremotedb,
+        :nolocaldb,
+        :file_mismatch
+        )
+
+# struct {
+#         const char *func;
+#         const char *arg;
+# } e_errno;
+  class EventErrno < ::FFI::Struct
+    layout :func, :string,
+           :arg, :string
+  end
+
+# struct {
+#         char *msg;
+# } e_pkg_error;
+  class EventPkgError < ::FFI::Struct
+    layout :msg, :string
+  end
+
+# struct {
+#         const char *url;
+#         off_t total;
+#         off_t done;
+#         time_t elapsed;
+# } e_fetching;
+  class EventFetching < ::FFI::Struct
+    layout :url, :string,
+           :total, :off_t,
+           :done, :off_t,
+           :elapsed, :time_t
+  end
+
+# struct {
+#         struct pkg *pkg;
+# } e_already_installed;
+  class EventAlreadyInstalled < ::FFI::Struct
+    layout :pkg, :pointer
+  end
+
+# struct {
+#         struct pkg *pkg;
+# } e_install_begin;
+  class EventInstallBegin < ::FFI::Struct
+    layout :pkg, :pointer
+  end
+
+# struct {
+#         struct pkg *pkg;
+# } e_install_finished;
+  class EventInstallFinished < ::FFI::Struct
+    layout :pkg, :pointer
+  end
+
+# struct {
+#         struct pkg *pkg;
+# } e_deinstall_begin;
+  class EventDeinstallBegin < ::FFI::Struct
+    layout :pkg, :pointer
+  end
+
+# struct {
+#         struct pkg *pkg;
+# } e_deinstall_finished;
+  class EventDeinstallFinished < ::FFI::Struct
+    layout :pkg, :pointer
+  end
+
+# struct {
+#         struct pkg *pkg;
+# } e_upgrade_begin;
+  class EventUpgradeBegin < ::FFI::Struct
+    layout :pkg, :pointer
+  end
+
+# struct {
+#         struct pkg *pkg;
+# } e_upgrade_finished;
+  class EventUpgradeFinished < ::FFI::Struct
+    layout :pkg, :pointer
+  end
+
+# struct {
+#         struct pkg *pkg;
+#         struct pkg_dep *dep;
+# } e_missing_dep;
+  class EventMissingDep < ::FFI::Struct
+    layout :pkg, :pointer,
+           :pkg_dep, :pointer
+  end
+
+# struct {
+#         struct pkg *pkg;
+#         int force;
+# } e_required;
+  class EventRequired < ::FFI::Struct
+    layout :pkg, :pointer,
+           :force, :int
+  end
+
+# struct {
+#         const char *repo;
+# } e_remotedb;
+  class EventRemotedb < ::FFI::Struct
+    layout :repo, :string
+  end
+
+# struct {
+#         struct pkg *pkg;
+#         struct pkg_file *file;
+#         const char *newsum;
+# } e_file_mismatch;
+  class EventFileMismatch < ::FFI::Struct
+    layout :pkg, :pointer,
+           :file, :pointer,
+           :newsum, :string
+  end
+
+  class EventU < ::FFI::Union
+    layout :errno,              EventErrno,
+           :pkg_error,          EventPkgError,
+           :fetching,           EventFetching,
+           :already_installed,  EventAlreadyInstalled,
+           :install_begin,      EventInstallBegin,
+           :install_finished,   EventInstallFinished,
+           :deinstall_begin,    EventDeinstallBegin,
+           :deinstall_finished, EventDeinstallFinished,
+           :upgrade_begin,      EventUpgradeBegin,
+           :upgrade_finished,   EventUpgradeFinished,
+           :missing_dep,        EventMissingDep,
+           :required,           EventRequired,
+           :remotedb,           EventRemotedb,
+           :file_mismatch,      EventFileMismatch
+  end
+
+  class Event < ::FFI::Struct
+    layout :type, EventType,
+           :event, EventU
+  end
+
   class PkgLoad
     BASIC      = 0
     DEPS       = (1<<0)
@@ -175,10 +336,178 @@ module Pkg
   # const char *pkg_config_kv_get(struct pkg_config_kv *kv, pkg_config_kv_t type);
   attach_function :pkg_config_kv_get, [:pointer, KeyvalueType], :string
 
+
   # int pkg_update(const char *name, const char *packagesite);
   attach_function :pkg_update, [:string, :string], :int
 
+
+  # typedef int(*pkg_event_cb)(void *, struct pkg_event *);
+  callback :pkg_event_cb, [:pointer, :pointer], :int
+
+  # void pkg_event_register(pkg_event_cb cb, void *data);
+  attach_function :pkg_event_register, [:pkg_event_cb, :pointer], :void
+
+  class EventHandler
+    def self.install_begin(pkg)
+      puts "Install begin"
+      puts pkg
+    end
+    def self.install_finished(pkg)
+      puts "Install finished"
+      puts pkg
+    end
+    def self.deinstall_begin(pkg)
+      puts "Deinstall begin"
+      puts pkg
+    end
+    def self.deinstall_finished(pkg)
+      puts "Deinstall finished"
+      puts pkg
+    end
+    def self.upgrade_begin(pkg)
+      puts "upgrade begin"
+      puts pkg
+    end
+    def self.upgrade_finished(pkg)
+      puts "upgrade finished"
+      puts pkg
+    end
+    def self.fetching(url, total, done, elapsed)
+      puts "fetching"
+      puts url
+      puts total
+      puts done
+      puts elapsed
+    end
+    def self.integritycheck_begin()
+      puts "integritycheck begin"
+    end
+    def self.integritycheck_finished()
+      puts "integritycheck finished"
+    end
+    def self.newpkgversion()
+      puts "newpkgversion"
+    end
+    def self.error(msg)
+      puts "error"
+      puts msg
+    end
+    def self.errno(func, arg)
+      puts "errno"
+      puts func
+      puts arg
+    end
+    def self.archive_comp_unsup()
+      puts "archive comp unsup"
+    end
+    def self.already_installed(pkg)
+      puts "already installed"
+      puts pkg
+    end
+    def self.failed_cksum()
+      puts "failed checksum"
+    end
+    def self.create_db_error()
+      puts "create db error"
+    end
+    def self.required(pkg)
+      puts "required"
+      puts pkg
+    end
+    def self.noremotedb(repo)
+      puts "noremotedb"
+      puts repo
+    end
+    def self.nolocaldb()
+      puts "nolocaldb"
+    end
+
+    def self.handle_event()
+      Proc.new do |ptr, event_ptr|
+        event = Event.new(event_ptr)
+
+        case(event[:type])
+          when :install_begin
+            pkg = Pkg.new(event[:event][:install_begin][:pkg])
+            EventHandler.install_begin(pkg)
+          when :install_finished
+            pkg = Pkg.new(event[:event][:install_finished][:pkg])
+            EventHandler.install_finished(pkg)
+          when :deinstall_begin
+            pkg = Pkg.new(event[:event][:deinstall_begin][:pkg])
+            EventHandler.deinstall_begin(pkg)
+          when :deinstall_finished
+            pkg = Pkg.new(event[:event][:deinstall_finished][:pkg])
+            EventHandler.deinstall_finished(pkg)
+          when :upgrade_begin
+            pkg = Pkg.new(event[:event][:upgrade_begin][:pkg])
+            EventHandler.upgrade_begin(pkg)
+          when :upgrade_finished
+            pkg = Pkg.new(event[:event][:upgrade_finished][:pkg])
+            EventHandler.upgrade_finished(pkg)
+          when :fetching
+            url     = event[:event][:fetching][:url]
+            total   = event[:event][:fetching][:total]
+            done    = event[:event][:fetching][:done]
+            elapsed = event[:event][:fetching][:elapsed]
+            EventHandler.fetching(url, total, done, elapsed)
+          when :integritycheck_begin
+            EventHandler.integritycheck_begin()
+          when :integritycheck_finished
+            EventHandler.integritycheck_finished()
+          when :newpkgversion
+            EventHandler.newpkgversion()
+          when :error
+            msg = event[:event][:pkg_error][:msg]
+            EventHandler.error(msg)
+          when :errno
+            func = event[:event][:errno][:func]
+            arg  = event[:event][:errno][:arg]
+            EventHandler.errno(func, arg)
+          when :archive_comp_unsup
+            EventHandler.archive_comp_unsup()
+          when :already_installed
+            pkg = Pkg.new(event[:event][:already_installed][:pkg])
+            EventHandler.already_installed(pkg)
+          when :failed_cksum
+            EventHandler.failed_cksum()
+          when :create_db_error
+            EventHandler.create_db_error()
+          when :required
+            pkg   = Pkg.new(event[:event][:required][:pkg])
+            force = event[:event][:required][:force]
+            EventHandler.required(pkg)
+          when :missing_dep
+            # TODO: Missing pkg_dep_get binding
+          when :noremotedb
+            repo = event[:event][:remotedb][:repo]
+            EventHandler.noremotedb(repo)
+          when :nolocaldb
+            EventHandler.nolocaldb()
+          when :file_mismatch
+            # TODO: Missing pkg_files binding
+            #Pkg.new(event[:event][:file_mismatch][:pkg])
+            #event[:event][:file_mismatch][:file]
+            #event[:event][:file_mismatch][:newsum]
+            #EventHandler.file_mismatch()
+        end
+      end
+    end
+
+    def self.install()
+      ::Pkg.pkg_event_register(EventHandler.handle_event, ::FFI::Pointer::NULL)
+    end
+  end
+
   class Pkg
+    def initialize(ptr)
+      @pkg = ptr
+    end
+
+    def name
+      Pkg.get_pkg(@pkg, [:name])[:name]
+    end
+
     def self.init()
       if !defined?(@initialized)
         res = ::Pkg::pkg_init(nil)
