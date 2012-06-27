@@ -320,6 +320,9 @@ module Pkg
   #   pointer to pkgdb_it
   attach_function :pkgdb_search, [:pointer, :string, Match, :int, :string], :pointer
 
+  # struct pkgdb_it *pkgdb_query_installs(struct pkgdb *db, match_t type, int nbpkgs, char **pkgs, const char *reponame, bool force);
+  attach_function :pkgdb_query_installs, [:pointer, Match, :int, :pointer, :string, :bool], :pointer
+
   #
   # int
   # pkgdb_it_next(struct pkgdb_it *it, struct pkg **pkg_p, int flags)
@@ -329,6 +332,7 @@ module Pkg
   attach_function :pkgdb_it_free, [:pointer], :void
 
   attach_function "pkg_get2", [:pointer, :varargs], :int
+
 
   # int pkg_config_string(pkg_config_key key, const char **value);
   attach_function :pkg_config_string, [ConfigKey, :pointer], :int
@@ -718,6 +722,8 @@ module Pkg
       @db_pointer = db_ptr_ptr.read_pointer()
       raise "NULL pointer for db pointer" if @db_pointer.null?
 
+      @jobs = {}
+
       # set destructor
       ObjectSpace.define_finalizer @db_pointer, proc { Search.finalize(@db_pointer) }
     end
@@ -730,7 +736,8 @@ module Pkg
       :match => Match[:regex],
       :field => Field[:name],
       :reponame => "default",
-      :return => [:name]
+      :return => [:name],
+      :force => false
     }
 
     def search(pattern, opts={})
@@ -755,6 +762,47 @@ module Pkg
       end
 
       ary
+    end
+
+    def search_install(packages, opts={})
+      Pkg.init()
+
+      options = SEARCH_DEFAULT.merge(opts)
+      job = Jobs.new(@db_pointer, :fetch)
+
+      if packages.class == String
+        packages = [packages]
+      end
+
+      begin
+        package_ary = []
+        packages.each do |pkg|
+          package_ary << ::FFI::MemoryPointer.from_string(pkg)
+        end
+        package_ary << nil
+
+        package_ptr = FFI::MemoryPointer.new(:pointer, package_ary.length)
+        package_ary.each_with_index do |p, i|
+          package_ptr[i].put_pointer(0, p)
+        end
+
+        it_ptr = ::Pkg.pkgdb_query_installs(@db_pointer, options[:match], packages.size(), package_ptr, options[:reponame], options[:force])
+        # no results
+        raise "Search returned NULL" if it_ptr.null?
+
+        pkg_ptr = ::FFI::MemoryPointer.new(:pointer)
+
+        while((res = ::Pkg.pkgdb_it_next(it_ptr, pkg_ptr, PkgLoad::BASIC || PkgLoad::DEPS)) == Epkg[:ok]) do
+          pkg = pkg_ptr.read_pointer()
+
+          job.add(pkg)
+        end
+      ensure
+        # Cleanup
+        ::Pkg.pkgdb_it_free(it_ptr)
+      end
+
+      job
     end
 
   end
