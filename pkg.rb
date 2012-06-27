@@ -116,6 +116,12 @@ module Pkg
         :value
         )
 
+  JobsType = enum(
+        :install,
+        :deinstall,
+        :fetch
+        )
+
   EventType = enum(
         :install_begin, 0,
         :install_finished,
@@ -339,6 +345,25 @@ module Pkg
 
   # int pkg_update(const char *name, const char *packagesite);
   attach_function :pkg_update, [:string, :string], :int
+
+
+  # int pkg_jobs_new(struct pkg_jobs **jobs, pkg_jobs_t type, struct pkgdb *db);
+  attach_function :pkg_jobs_new, [:pointer, JobsType, :pointer], :int
+
+  # void pkg_jobs_free(struct pkg_jobs *jobs);
+  attach_function :pkg_jobs_free, [:pointer], :void
+
+  # int pkg_jobs_add(struct pkg_jobs *jobs, struct pkg *pkg);
+  attach_function :pkg_jobs_add, [:pointer, :pointer], :int
+
+  # int pkg_jobs_is_empty(struct pkg_jobs *jobs);
+  attach_function :pkg_jobs_is_empty, [:pointer], :int
+
+  # int pkg_jobs(struct pkg_jobs *jobs, struct pkg **pkg);
+  attach_function :pkg_jobs, [:pointer, :pointer], :int
+
+  # int pkg_jobs_apply(struct pkg_jobs *jobs, int force);
+  attach_function :pkg_jobs_apply, [:pointer, :int], :int
 
 
   # typedef int(*pkg_event_cb)(void *, struct pkg_event *);
@@ -597,6 +622,34 @@ module Pkg
       end
 
       output
+    end
+  end
+
+  class Jobs
+    def initialize(db, type = :install)
+      jobs_ptr = ::FFI::MemoryPointer.new(:pointer)
+
+      res = ::Pkg.pkg_jobs_new(jobs_ptr, type, db)
+      raise "Couldn't initialize jobs" if res != Epkg[:ok]
+
+      @jobs = jobs_ptr.read_pointer()
+
+      ObjectSpace.define_finalizer @jobs, proc { Jobs.finalize(@jobs) }
+    end
+
+    def self.finalize(ptr)
+      ::Pkg.pkg_jobs_free(ptr)
+    end
+
+    def add(pkg)
+      res = ::Pkg.pkg_jobs_add(@jobs, pkg)
+      raise "Couldn't add job" if res != Epkg[:ok]
+    end
+
+    def apply(force = false)
+      flags = force ? 1 : 0
+      res = ::Pkg.pkg_jobs_apply(@jobs, flags)
+      raise "Couldn't apply jobs: #{Epkg[res]}" if res != Epkg[:ok]
     end
   end
 
