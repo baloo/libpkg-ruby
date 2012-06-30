@@ -7,166 +7,7 @@ module Pkg
   ffi_lib "/root/pkgng/libpkg/libpkg.so.0"
 
   require 'pkg/enum'
-
-
-# struct {
-#         const char *func;
-#         const char *arg;
-# } e_errno;
-  class EventErrno < ::FFI::Struct
-    layout :func, :string,
-           :arg, :string
-  end
-
-# struct {
-#         char *msg;
-# } e_pkg_error;
-  class EventPkgError < ::FFI::Struct
-    layout :msg, :string
-  end
-
-# struct {
-#         const char *url;
-#         off_t total;
-#         off_t done;
-#         time_t elapsed;
-# } e_fetching;
-  class EventFetching < ::FFI::Struct
-    layout :url, :string,
-           :total, :off_t,
-           :done, :off_t,
-           :elapsed, :time_t
-  end
-
-# struct {
-#         struct pkg *pkg;
-# } e_already_installed;
-  class EventAlreadyInstalled < ::FFI::Struct
-    layout :pkg, :pointer
-  end
-
-# struct {
-#         struct pkg *pkg;
-# } e_install_begin;
-  class EventInstallBegin < ::FFI::Struct
-    layout :pkg, :pointer
-  end
-
-# struct {
-#         struct pkg *pkg;
-# } e_install_finished;
-  class EventInstallFinished < ::FFI::Struct
-    layout :pkg, :pointer
-  end
-
-# struct {
-#         struct pkg *pkg;
-# } e_deinstall_begin;
-  class EventDeinstallBegin < ::FFI::Struct
-    layout :pkg, :pointer
-  end
-
-# struct {
-#         struct pkg *pkg;
-# } e_deinstall_finished;
-  class EventDeinstallFinished < ::FFI::Struct
-    layout :pkg, :pointer
-  end
-
-# struct {
-#         struct pkg *pkg;
-# } e_upgrade_begin;
-  class EventUpgradeBegin < ::FFI::Struct
-    layout :pkg, :pointer
-  end
-
-# struct {
-#         struct pkg *pkg;
-# } e_upgrade_finished;
-  class EventUpgradeFinished < ::FFI::Struct
-    layout :pkg, :pointer
-  end
-
-# struct {
-#         struct pkg *pkg;
-#         struct pkg_dep *dep;
-# } e_missing_dep;
-  class EventMissingDep < ::FFI::Struct
-    layout :pkg, :pointer,
-           :pkg_dep, :pointer
-  end
-
-# struct {
-#         struct pkg *pkg;
-#         int force;
-# } e_required;
-  class EventRequired < ::FFI::Struct
-    layout :pkg, :pointer,
-           :force, :int
-  end
-
-# struct {
-#         const char *repo;
-# } e_remotedb;
-  class EventRemotedb < ::FFI::Struct
-    layout :repo, :string
-  end
-
-# struct {
-#         struct pkg *pkg;
-#         struct pkg_file *file;
-#         const char *newsum;
-# } e_file_mismatch;
-  class EventFileMismatch < ::FFI::Struct
-    layout :pkg, :pointer,
-           :file, :pointer,
-           :newsum, :string
-  end
-
-  class EventU < ::FFI::Union
-    layout :errno,              EventErrno,
-           :pkg_error,          EventPkgError,
-           :fetching,           EventFetching,
-           :already_installed,  EventAlreadyInstalled,
-           :install_begin,      EventInstallBegin,
-           :install_finished,   EventInstallFinished,
-           :deinstall_begin,    EventDeinstallBegin,
-           :deinstall_finished, EventDeinstallFinished,
-           :upgrade_begin,      EventUpgradeBegin,
-           :upgrade_finished,   EventUpgradeFinished,
-           :missing_dep,        EventMissingDep,
-           :required,           EventRequired,
-           :remotedb,           EventRemotedb,
-           :file_mismatch,      EventFileMismatch
-  end
-
-  class Event < ::FFI::Struct
-    layout :type, Enum::EventType,
-           :event, EventU
-  end
-
-  class PkgLoad
-    BASIC      = 0
-    DEPS       = (1<<0)
-    RDEPS      = (1<<1)
-    FILES      = (1<<2)
-    SCRIPTS    = (1<<3)
-    OPTIONS    = (1<<4)
-    MTREE      = (1<<5)
-    DIRS       = (1<<6)
-    CATEGORIES = (1<<7)
-    LICENSES   = (1<<8)
-    USERS      = (1<<9)
-    GROUPS     = (1<<10)
-    SHLIBS     = (1<<11)
-  end
-
-  class Db < ::FFI::Struct
-    # sqlite3 *sqlite;
-    # pkgdb_t type;
-    layout :sqlite, :pointer,
-           :type, Enum::DbType
-  end
+  require 'pkg/struct'
 
   attach_function :pkg_init, [:string], :int
   attach_function :pkg_shutdown, [:void], :void
@@ -614,7 +455,7 @@ module Pkg
 
         pkg_ptr = ::FFI::MemoryPointer.new(:pointer)
 
-        while((res = ::Pkg.pkgdb_it_next(it_ptr, pkg_ptr, PkgLoad::BASIC)) == Enum::Epkg[:ok]) do
+        while((res = ::Pkg.pkgdb_it_next(it_ptr, pkg_ptr, Enum::PkgLoad::BASIC)) == Enum::Epkg[:ok]) do
           pkg = pkg_ptr.read_pointer()
           ary << Pkg.get_pkg(pkg, options[:return])
         end
@@ -654,7 +495,7 @@ module Pkg
 
         pkg_ptr = ::FFI::MemoryPointer.new(:pointer)
 
-        while((res = ::Pkg.pkgdb_it_next(it_ptr, pkg_ptr, PkgLoad::BASIC || PkgLoad::DEPS)) == Epkg[:ok]) do
+        while((res = ::Pkg.pkgdb_it_next(it_ptr, pkg_ptr, Enum::PkgLoad::BASIC || Enum::PkgLoad::DEPS)) == Epkg[:ok]) do
           pkg = pkg_ptr.read_pointer()
 
           job.add(pkg)

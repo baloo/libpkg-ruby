@@ -152,6 +152,24 @@ module Pkg
           :file_mismatch
           )
 
+    class PkgLoad
+      BASIC      = 0
+      DEPS       = (1<<0)
+      RDEPS      = (1<<1)
+      FILES      = (1<<2)
+      SCRIPTS    = (1<<3)
+      OPTIONS    = (1<<4)
+      MTREE      = (1<<5)
+      DIRS       = (1<<6)
+      CATEGORIES = (1<<7)
+      LICENSES   = (1<<8)
+      USERS      = (1<<9)
+      GROUPS     = (1<<10)
+      SHLIBS     = (1<<11)
+    end
+
+
+
 
   end
 end
