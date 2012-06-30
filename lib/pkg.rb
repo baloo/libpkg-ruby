@@ -6,146 +6,8 @@ module Pkg
   extend ::FFI::Library
   ffi_lib "/root/pkgng/libpkg/libpkg.so.0"
 
-  DbType = enum(:default,
-                :remote)
+  require 'pkg/enum'
 
-  Epkg = enum(
-        :ok,
-        :end,
-        :warn,
-        :fatal,
-        :required,
-        :installed,
-        :dependency,
-        :enodb,
-        :uptodate,
-        :unknown
-        )
-
-  Field = enum(
-        :none,
-        :origin,
-        :name,
-        :namever,
-        :comment,
-        :desc
-        )
-
-  Match = enum(
-        :all,
-        :exact,
-        :glob,
-        :regex,
-        :eregex,
-        :condition)
-
-  Attributes = enum(
-        :origin, 1,
-        :name,
-        :version,
-        :comment,
-        :desc,
-        :mtree,
-        :message,
-        :arch,
-        :maintainer,
-        :www,
-        :prefix,
-        :infos,
-        :repopath,
-        :cksum,
-        :newversion,
-        :reponame,
-        :repourl,
-        :flatsize,
-        :new_flatsize,
-        :new_pkgsize,
-        :license_logic,
-        :automatic,
-        :rowid,
-        :time)
-
-  PKG_NUM_FIELDS=64
-
-  License = enum(
-        :or,     '|',
-        :and,    '&',
-        :single, 1
-        )
-
-  PkgConfig = enum(
-        :repo, 0,
-        :dbdir, 1,
-        :cachedir, 2,
-        :portsdir, 3,
-        :repokey, 4,
-        :multirepos, 5,
-        :handle_rc_scripts, 6,
-        :assume_always_yes, 7,
-        :repos, 8,
-        :plist_keywords_dir, 9,
-        :syslog, 10,
-        :shlibs, 11,
-        :autodeps, 12,
-        :abi, 13,
-        :developer_mode, 14,
-        :portaudit_site, 15
-        )
-
-  ConfigKey = enum(
-        :repo, 0,
-        :dbdir, 1,
-        :cachedir, 2,
-        :portsdir, 3,
-        :repokey, 4,
-        :multirepos, 5,
-        :handle_rc_scripts, 6,
-        :assume_always_yes, 7,
-        :repos, 8,
-        :plist_keywords_dir, 9,
-        :syslog, 10,
-        :shlibs, 11,
-        :autodeps, 12,
-        :abi, 13,
-        :developer_mode, 14,
-        :portaudit_site, 15
-        )
-
-  KeyvalueType = enum(
-        :key,
-        :value
-        )
-
-  JobsType = enum(
-        :install,
-        :deinstall,
-        :fetch
-        )
-
-  EventType = enum(
-        :install_begin, 0,
-        :install_finished,
-        :deinstall_begin,
-        :deinstall_finished,
-        :upgrade_begin,
-        :upgrade_finished,
-        :fetching,
-        :integritycheck_begin,
-        :integritycheck_finished,
-        :newpkgversion,
-
-        :error,
-        :errno,
-        :archive_comp_unsup, 65536,
-        :already_installed,
-        :failed_cksum,
-        :create_db_error,
-        :required,
-        :missing_dep,
-        :noremotedb,
-        :nolocaldb,
-        :file_mismatch
-        )
 
 # struct {
 #         const char *func;
@@ -279,7 +141,7 @@ module Pkg
   end
 
   class Event < ::FFI::Struct
-    layout :type, EventType,
+    layout :type, Enum::EventType,
            :event, EventU
   end
 
@@ -303,13 +165,13 @@ module Pkg
     # sqlite3 *sqlite;
     # pkgdb_t type;
     layout :sqlite, :pointer,
-           :type, DbType
+           :type, Enum::DbType
   end
 
   attach_function :pkg_init, [:string], :int
   attach_function :pkg_shutdown, [:void], :void
 
-  attach_function :pkgdb_open, [:pointer, DbType], :int
+  attach_function :pkgdb_open, [:pointer, Enum::DbType], :int
 
   # void pkgdb_close(struct pkgdb *db);
   attach_function :pkgdb_close, [:pointer], :void
@@ -318,10 +180,10 @@ module Pkg
   #   struct pkgdb *db, const char *pattern, match_t match, unsigned int field, const char * reponame
   # Return:
   #   pointer to pkgdb_it
-  attach_function :pkgdb_search, [:pointer, :string, Match, :int, :string], :pointer
+  attach_function :pkgdb_search, [:pointer, :string, Enum::Match, :int, :string], :pointer
 
   # struct pkgdb_it *pkgdb_query_installs(struct pkgdb *db, match_t type, int nbpkgs, char **pkgs, const char *reponame, bool force);
-  attach_function :pkgdb_query_installs, [:pointer, Match, :int, :pointer, :string, :bool], :pointer
+  attach_function :pkgdb_query_installs, [:pointer, Enum::Match, :int, :pointer, :string, :bool], :pointer
 
   #
   # int
@@ -335,16 +197,16 @@ module Pkg
 
 
   # int pkg_config_string(pkg_config_key key, const char **value);
-  attach_function :pkg_config_string, [ConfigKey, :pointer], :int
+  attach_function :pkg_config_string, [Enum::ConfigKey, :pointer], :int
 
   # int pkg_config_bool(pkg_config_key key, bool *value);
-  attach_function :pkg_config_bool, [ConfigKey, :pointer], :int
+  attach_function :pkg_config_bool, [Enum::ConfigKey, :pointer], :int
 
   # pkg_config_list(pkg_config_key key, struct pkg_config_kv **kv);
-  attach_function :pkg_config_list, [ConfigKey, :pointer], :int
+  attach_function :pkg_config_list, [Enum::ConfigKey, :pointer], :int
 
   # const char *pkg_config_kv_get(struct pkg_config_kv *kv, pkg_config_kv_t type);
-  attach_function :pkg_config_kv_get, [:pointer, KeyvalueType], :string
+  attach_function :pkg_config_kv_get, [:pointer, Enum::KeyvalueType], :string
 
 
   # int pkg_update(const char *name, const char *packagesite);
@@ -352,7 +214,7 @@ module Pkg
 
 
   # int pkg_jobs_new(struct pkg_jobs **jobs, pkg_jobs_t type, struct pkgdb *db);
-  attach_function :pkg_jobs_new, [:pointer, JobsType, :pointer], :int
+  attach_function :pkg_jobs_new, [:pointer, Enum::JobsType, :pointer], :int
 
   # void pkg_jobs_free(struct pkg_jobs *jobs);
   attach_function :pkg_jobs_free, [:pointer], :void
@@ -584,11 +446,11 @@ module Pkg
       output = {}
 
       fields.each do |field|
-        if not Attributes[field].nil?
-          args << Attributes
-          args << Attributes[field]
+        if not Enum::Attributes[field].nil?
+          args << Enum::Attributes
+          args << Enum::Attributes[field]
           args << :pointer
-          if Attributes[field] < ::Pkg::PKG_NUM_FIELDS
+          if Enum::Attributes[field] < ::Pkg::Enum::PKG_NUM_FIELDS
             ptr = ::FFI::MemoryPointer.new(:pointer)
             args << ptr
             read_values << lambda {Pkg.read_string(ptr, field, output)}
@@ -634,7 +496,7 @@ module Pkg
       jobs_ptr = ::FFI::MemoryPointer.new(:pointer)
 
       res = ::Pkg.pkg_jobs_new(jobs_ptr, type, db)
-      raise "Couldn't initialize jobs" if res != Epkg[:ok]
+      raise "Couldn't initialize jobs" if res != Enum::Epkg[:ok]
 
       @jobs = jobs_ptr.read_pointer()
 
@@ -647,13 +509,13 @@ module Pkg
 
     def add(pkg)
       res = ::Pkg.pkg_jobs_add(@jobs, pkg)
-      raise "Couldn't add job" if res != Epkg[:ok]
+      raise "Couldn't add job" if res != Enum::Epkg[:ok]
     end
 
     def apply(force = false)
       flags = force ? 1 : 0
       res = ::Pkg.pkg_jobs_apply(@jobs, flags)
-      raise "Couldn't apply jobs: #{Epkg[res]}" if res != Epkg[:ok]
+      raise "Couldn't apply jobs: #{Enum::Epkg[res]}" if res != Enum::Epkg[:ok]
     end
   end
 
@@ -666,7 +528,7 @@ module Pkg
     def update
       res = ::Pkg.pkg_update(@name, @packagesite)
 
-      raise "Update failed with return code : #{res}" if res != Epkg[:ok] and res != Epkg[:uptodate]
+      raise "Update failed with return code : #{res}" if res != Enum::Epkg[:ok] and res != Enum::Epkg[:uptodate]
     end
 
     def inspect
@@ -680,26 +542,26 @@ module Pkg
 
       # Check if we need multirepos or not
       ptr = ::FFI::MemoryPointer.new(:bool)
-      res = ::Pkg.pkg_config_bool(PkgConfig[:multirepos], ptr)
-      raise "couldn't read config" if res != Epkg[:ok]
+      res = ::Pkg.pkg_config_bool(Enum::PkgConfig[:multirepos], ptr)
+      raise "couldn't read config" if res != Enum::Epkg[:ok]
 
       multirepos = (ptr.read_bytes(1) == "\001")
 
       if multirepos
         repokv_ptr_ptr = ::FFI::MemoryPointer.new(:pointer)
 
-        while (::Pkg.pkg_config_list(ConfigKey[:repos], repokv_ptr_ptr) == Epkg[:ok]) do
+        while (::Pkg.pkg_config_list(Enum::ConfigKey[:repos], repokv_ptr_ptr) == Enum::Epkg[:ok]) do
           repokv_ptr = repokv_ptr_ptr.read_pointer()
 
-          name = ::Pkg.pkg_config_kv_get(repokv_ptr, KeyvalueType[:key])
-          packagesite = ::Pkg.pkg_config_kv_get(repokv_ptr, KeyvalueType[:value])
+          name = ::Pkg.pkg_config_kv_get(repokv_ptr, Enum::KeyvalueType[:key])
+          packagesite = ::Pkg.pkg_config_kv_get(repokv_ptr, Enum::KeyvalueType[:value])
 
           repos << Repo.new(name, packagesite)
         end
       else
         ptr = ::FFI::MemoryPointer.new(:pointer)
-        res = ::Pkg.pkg_config_string(ConfigKey[:repo], ptr)
-        raise "couldn't read config" if res != Epkg[:ok]
+        res = ::Pkg.pkg_config_string(Enum::ConfigKey[:repo], ptr)
+        raise "couldn't read config" if res != Enum::Epkg[:ok]
 
         packagesite_ptr = ptr.read_pointer()
         raise "PACKAGESITE is not defined." if packagesite_ptr.null?
@@ -717,7 +579,7 @@ module Pkg
       db_ptr_ptr = FFI::MemoryPointer.new(:pointer)
       res = ::Pkg.pkgdb_open(db_ptr_ptr, db_type)
 
-      raise "pkgdb_open failed: #{res}" if res != Epkg[:ok]
+      raise "pkgdb_open failed: #{res}" if res != Enum::Epkg[:ok]
 
       @db_pointer = db_ptr_ptr.read_pointer()
       raise "NULL pointer for db pointer" if @db_pointer.null?
@@ -733,8 +595,8 @@ module Pkg
     end
 
     SEARCH_DEFAULT = {
-      :match => Match[:regex],
-      :field => Field[:name],
+      :match => Enum::Match[:regex],
+      :field => Enum::Field[:name],
       :reponame => "default",
       :return => [:name],
       :force => false
@@ -752,7 +614,7 @@ module Pkg
 
         pkg_ptr = ::FFI::MemoryPointer.new(:pointer)
 
-        while((res = ::Pkg.pkgdb_it_next(it_ptr, pkg_ptr, PkgLoad::BASIC)) == Epkg[:ok]) do
+        while((res = ::Pkg.pkgdb_it_next(it_ptr, pkg_ptr, PkgLoad::BASIC)) == Enum::Epkg[:ok]) do
           pkg = pkg_ptr.read_pointer()
           ary << Pkg.get_pkg(pkg, options[:return])
         end
