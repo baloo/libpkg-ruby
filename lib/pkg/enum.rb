@@ -43,7 +43,6 @@ module Pkg
           :exact,
           :glob,
           :regex,
-          :eregex,
           :condition)
 
     Attributes = enum(
