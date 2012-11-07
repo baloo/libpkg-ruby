@@ -2,6 +2,7 @@ require 'rubygems'
 require 'ffi'
 
 
+
 module Pkg
   extend ::FFI::Library
   ffi_lib "/root/pkgng/libpkg/libpkg.so.0"
@@ -62,9 +63,6 @@ module Pkg
 
   # int pkg_jobs_add(struct pkg_jobs *jobs, struct pkg *pkg);
   attach_function :pkg_jobs_add, [:pointer, :pointer], :int
-
-  # int pkg_jobs_is_empty(struct pkg_jobs *jobs);
-  attach_function :pkg_jobs_is_empty, [:pointer], :int
 
   # int pkg_jobs(struct pkg_jobs *jobs, struct pkg **pkg);
   attach_function :pkg_jobs, [:pointer, :pointer], :int
@@ -211,6 +209,7 @@ module Pkg
             EventHandler.required(pkg)
           when :missing_dep
             # TODO: Missing pkg_dep_get binding
+            #TODO "Missing pkg_dep_get binding"
           when :noremotedb
             repo = event[:event][:remotedb][:repo]
             EventHandler.noremotedb(repo)
@@ -222,6 +221,7 @@ module Pkg
             #event[:event][:file_mismatch][:file]
             #event[:event][:file_mismatch][:newsum]
             #EventHandler.file_mismatch()
+            #TODO "Missing pkg_files binding"
         end
       end
     end
