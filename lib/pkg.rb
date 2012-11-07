@@ -24,8 +24,8 @@ module Pkg
   #   pointer to pkgdb_it
   attach_function :pkgdb_search, [:pointer, :string, Enum::Match, :int, :string], :pointer
 
-  # struct pkgdb_it *pkgdb_query_installs(struct pkgdb *db, match_t type, int nbpkgs, char **pkgs, const char *reponame, bool force);
-  attach_function :pkgdb_query_installs, [:pointer, Enum::Match, :int, :pointer, :string, :bool], :pointer
+  # struct pkgdb_it *pkgdb_query_installs(struct pkgdb *db, match_t type, int nbpkgs, char **pkgs, const char *reponame, bool force, bool recursive);
+  attach_function :pkgdb_query_installs, [:pointer, Enum::Match, :int, :pointer, :string, :bool, :bool], :pointer
 
   #
   # int
@@ -438,9 +438,10 @@ module Pkg
     SEARCH_DEFAULT = {
       :match => Enum::Match[:regex],
       :field => Enum::Field[:name],
-      :reponame => "default",
+      :reponame => "repo",
       :return => [:name],
-      :force => false
+      :force => false,
+      :recursive => false
     }
 
     def search(pattern, opts={})
@@ -477,28 +478,30 @@ module Pkg
         packages = [packages]
       end
 
+      package_ary = []
+      packages.each do |pkg|
+        package_ary << ::FFI::MemoryPointer.from_string(pkg)
+      end
+      package_ary << nil
+
+      package_ptr = FFI::MemoryPointer.new(:pointer, package_ary.length)
+      package_ary.each_with_index do |p, i|
+        package_ptr[i].put_pointer(0, p)
+      end
+
+      it_ptr = ::Pkg.pkgdb_query_installs(@db_pointer, options[:match], packages.size(), package_ptr, options[:reponame], options[:force], options[:recursive])
+
       begin
-        package_ary = []
-        packages.each do |pkg|
-          package_ary << ::FFI::MemoryPointer.from_string(pkg)
-        end
-        package_ary << nil
-
-        package_ptr = FFI::MemoryPointer.new(:pointer, package_ary.length)
-        package_ary.each_with_index do |p, i|
-          package_ptr[i].put_pointer(0, p)
-        end
-
-        it_ptr = ::Pkg.pkgdb_query_installs(@db_pointer, options[:match], packages.size(), package_ptr, options[:reponame], options[:force])
         # no results
         raise "Search returned NULL" if it_ptr.null?
 
         pkg_ptr = ::FFI::MemoryPointer.new(:pointer)
 
-        while((res = ::Pkg.pkgdb_it_next(it_ptr, pkg_ptr, Enum::PkgLoad::BASIC || Enum::PkgLoad::DEPS)) == Epkg[:ok]) do
+        while((res = ::Pkg.pkgdb_it_next(it_ptr, pkg_ptr, Enum::PkgLoad::BASIC || Enum::PkgLoad::DEPS)) == Enum::Epkg[:ok]) do
           pkg = pkg_ptr.read_pointer()
 
           job.add(pkg)
+          pkg = nil
         end
       ensure
         # Cleanup
