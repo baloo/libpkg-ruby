@@ -9,6 +9,10 @@ module Pkg
       ::FFI::Enum.new(args)
     end
 
+    DepAttr = enum(:name,
+                   :origin,
+                   :version)
+
     DbType = enum(:default,
                   :remote)
 

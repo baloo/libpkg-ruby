@@ -37,6 +37,8 @@ module Pkg
 
   attach_function "pkg_get2", [:pointer, :varargs], :int
 
+  # const char * pkg_dep_get(struct pkg_dep const * const d, const pkg_dep_attr attr)
+  attach_function :pkg_dep_get, [:pointer, Enum::DepAttr], :string
 
   # int pkg_config_string(pkg_config_key key, const char **value);
   attach_function :pkg_config_string, [Enum::ConfigKey, :pointer], :int
@@ -77,158 +79,180 @@ module Pkg
   # void pkg_event_register(pkg_event_cb cb, void *data);
   attach_function :pkg_event_register, [:pkg_event_cb, :pointer], :void
 
-  class EventHandler
-    def self.install_begin(pkg)
-      puts "Install begin"
-      puts pkg
-    end
-    def self.install_finished(pkg)
-      puts "Install finished"
-      puts pkg
-    end
-    def self.deinstall_begin(pkg)
-      puts "Deinstall begin"
-      puts pkg
-    end
-    def self.deinstall_finished(pkg)
-      puts "Deinstall finished"
-      puts pkg
-    end
-    def self.upgrade_begin(pkg)
-      puts "upgrade begin"
-      puts pkg
-    end
-    def self.upgrade_finished(pkg)
-      puts "upgrade finished"
-      puts pkg
-    end
-    def self.fetching(url, total, done, elapsed)
-      puts "fetching"
-      puts url
-      puts total
-      puts done
-      puts elapsed
-    end
-    def self.integritycheck_begin()
-      puts "integritycheck begin"
-    end
-    def self.integritycheck_finished()
-      puts "integritycheck finished"
-    end
-    def self.newpkgversion()
-      puts "newpkgversion"
-    end
-    def self.error(msg)
-      puts "error"
-      puts msg
-    end
-    def self.errno(func, arg)
-      puts "errno"
-      puts func
-      puts arg
-    end
-    def self.archive_comp_unsup()
-      puts "archive comp unsup"
-    end
-    def self.already_installed(pkg)
-      puts "already installed"
-      puts pkg
-    end
-    def self.failed_cksum()
-      puts "failed checksum"
-    end
-    def self.create_db_error()
-      puts "create db error"
-    end
-    def self.required(pkg)
-      puts "required"
-      puts pkg
-    end
-    def self.noremotedb(repo)
-      puts "noremotedb"
-      puts repo
-    end
-    def self.nolocaldb()
-      puts "nolocaldb"
-    end
+  module EventHandler
+    require "logger"
 
-    def self.handle_event()
-      Proc.new do |ptr, event_ptr|
-        event = Event.new(event_ptr)
+    class Handler
+      def initialize()
+        @logger = Logger.new(STDOUT)
+      end
 
-        case(event[:type])
-          when :install_begin
-            pkg = Pkg.new(event[:event][:install_begin][:pkg])
-            EventHandler.install_begin(pkg)
-          when :install_finished
-            pkg = Pkg.new(event[:event][:install_finished][:pkg])
-            EventHandler.install_finished(pkg)
-          when :deinstall_begin
-            pkg = Pkg.new(event[:event][:deinstall_begin][:pkg])
-            EventHandler.deinstall_begin(pkg)
-          when :deinstall_finished
-            pkg = Pkg.new(event[:event][:deinstall_finished][:pkg])
-            EventHandler.deinstall_finished(pkg)
-          when :upgrade_begin
-            pkg = Pkg.new(event[:event][:upgrade_begin][:pkg])
-            EventHandler.upgrade_begin(pkg)
-          when :upgrade_finished
-            pkg = Pkg.new(event[:event][:upgrade_finished][:pkg])
-            EventHandler.upgrade_finished(pkg)
-          when :fetching
-            url     = event[:event][:fetching][:url]
-            total   = event[:event][:fetching][:total]
-            done    = event[:event][:fetching][:done]
-            elapsed = event[:event][:fetching][:elapsed]
-            EventHandler.fetching(url, total, done, elapsed)
-          when :integritycheck_begin
-            EventHandler.integritycheck_begin()
-          when :integritycheck_finished
-            EventHandler.integritycheck_finished()
-          when :newpkgversion
-            EventHandler.newpkgversion()
-          when :error
-            msg = event[:event][:pkg_error][:msg]
-            EventHandler.error(msg)
-          when :errno
-            func = event[:event][:errno][:func]
-            arg  = event[:event][:errno][:arg]
-            EventHandler.errno(func, arg)
-          when :archive_comp_unsup
-            EventHandler.archive_comp_unsup()
-          when :already_installed
-            pkg = Pkg.new(event[:event][:already_installed][:pkg])
-            EventHandler.already_installed(pkg)
-          when :failed_cksum
-            EventHandler.failed_cksum()
-          when :create_db_error
-            EventHandler.create_db_error()
-          when :required
-            pkg   = Pkg.new(event[:event][:required][:pkg])
-            force = event[:event][:required][:force]
-            EventHandler.required(pkg)
-          when :missing_dep
-            # TODO: Missing pkg_dep_get binding
-            #TODO "Missing pkg_dep_get binding"
-          when :noremotedb
-            repo = event[:event][:remotedb][:repo]
-            EventHandler.noremotedb(repo)
-          when :nolocaldb
-            EventHandler.nolocaldb()
-          when :file_mismatch
-            # TODO: Missing pkg_files binding
-            #Pkg.new(event[:event][:file_mismatch][:pkg])
-            #event[:event][:file_mismatch][:file]
-            #event[:event][:file_mismatch][:newsum]
-            #EventHandler.file_mismatch()
-            #TODO "Missing pkg_files binding"
-        end
+      def install_begin(pkg)
+        @logger.info("Install begin: #{pkg}")
+      end
+      def install_finished(pkg)
+        @logger.info("Install finished: #{pkg}")
+      end
+      def deinstall_begin(pkg)
+        @logger.info("Deinstall begin: #{pkg}")
+      end
+      def deinstall_finished(pkg)
+        @logger.info("Deinstall finished: #{pkg}")
+      end
+      def upgrade_begin(pkg)
+        @logger.info("Upgrade begin: #{pkg}")
+      end
+      def upgrade_finished(pkg)
+        @logger.info("Upgrade finished: #{pkg}")
+      end
+      def fetching(url, total, done, elapsed)
+        @logger.info("Fetching from #{url}(#{total}), #{done} in #{elapsed}")
+      end
+      def integritycheck_begin()
+        @logger.info("Integritycheck begin")
+      end
+      def integritycheck_finished()
+        @logger.info("Integritycheck finished")
+      end
+      def newpkgversion()
+        # TODO WTF?
+        @logger.info("New pkg version")
+      end
+      def error(msg)
+        @logger.error(msg)
+      end
+      def errno(func, arg)
+        @logger.error("#{func}(#{arg})")
+      end
+      def archive_comp_unsup()
+        # TODO WTF?
+        @logger.info("Archive comp unsup")
+      end
+      def already_installed(pkg)
+        @logger.info("Package #{pkg} already installed")
+      end
+      def failed_cksum()
+        @logger.error("Failed checksum")
+      end
+      def create_db_error()
+        @logger.error("Create db error")
+      end
+      def required(pkg)
+        @logger.info("Required")
+      end
+      def noremotedb(repo)
+        @logger.warn("repo #{repo} doesn't exists")
+      end
+      def nolocaldb()
+        @logger.warn("Local db doesn't exists")
+      end
+      def missing_dep(name, origin, version)
+        @logger.error("Missing dependency on #{name}(#{version}) for #{origin}")
       end
     end
 
-    def self.install()
-      ::Pkg.pkg_event_register(EventHandler.handle_event, ::FFI::Pointer::NULL)
+
+    @handler = nil
+
+    # Get the current handler or initialize a new one if none available
+    def self.handler
+      @handler || init
     end
+
+    # Register a new handler
+    def self.handler=(h)
+      @handler = h
+    end
+
+    # This method is called by pkgng when an event is emitted
+    # It will decode the event and call the handler with content
+    HandleEvent = FFI::Function.new(:void, [:pointer, :pointer], :blocking => true) do |ptr, event_ptr|
+    #HandleEvent = Proc.new do |ptr, event_ptr|
+      event = ::Pkg::Struct::Event.new(event_ptr)
+      msg = ""
+
+      case(event[:type])
+        when :install_begin
+          pkg = Pkg.new(event[:event][:install_begin][:pkg])
+          handler.install_begin(pkg)
+        when :install_finished
+          pkg = Pkg.new(event[:event][:install_finished][:pkg])
+          handler.install_finished(pkg)
+        when :deinstall_begin
+          pkg = Pkg.new(event[:event][:deinstall_begin][:pkg])
+          handler.deinstall_begin(pkg)
+        when :deinstall_finished
+          pkg = Pkg.new(event[:event][:deinstall_finished][:pkg])
+          handler.deinstall_finished(pkg)
+        when :upgrade_begin
+          pkg = Pkg.new(event[:event][:upgrade_begin][:pkg])
+          handler.upgrade_begin(pkg)
+        when :upgrade_finished
+          pkg = Pkg.new(event[:event][:upgrade_finished][:pkg])
+          handler.upgrade_finished(pkg)
+        when :fetching
+          url     = event[:event][:fetching][:url]
+          total   = event[:event][:fetching][:total]
+          done    = event[:event][:fetching][:done]
+          elapsed = event[:event][:fetching][:elapsed]
+          handler.fetching(url, total, done, elapsed)
+        when :integritycheck_begin
+          handler.integritycheck_begin()
+        when :integritycheck_finished
+          handler.integritycheck_finished()
+        when :newpkgversion
+          handler.newpkgversion()
+        when :error
+          handler.error(event[:event][:pkg_error][:msg])
+        when :errno
+          func = event[:event][:errno][:func]
+          arg  = event[:event][:errno][:arg]
+          handler.errno(func, arg)
+        when :archive_comp_unsup
+          handler.archive_comp_unsup()
+        when :already_installed
+          pkg = Pkg.new(event[:event][:already_installed][:pkg])
+          handler.already_installed(pkg)
+        when :failed_cksum
+          handler.failed_cksum()
+        when :create_db_error
+          handler.create_db_error()
+        when :required
+          pkg   = Pkg.new(event[:event][:required][:pkg])
+          force = event[:event][:required][:force]
+          handler.required(pkg)
+        when :missing_dep
+          pkg_dep = event[:event][:_dep][:pkg_dep]
+          name    = ::Pkg.pkg_dep_get(pkg_dep, Enum::DepAttr[:name])
+          origin  = ::Pkg.pkg_dep_get(pkg_dep, Enum::DepAttr[:origin])
+          version = ::Pkg.pkg_dep_get(pkg_dep, Enum::DepAttr[:version])
+          handler.missing_dep(name, origin, version)
+        when :noremotedb
+          repo = event[:event][:remotedb][:repo]
+          handler.noremotedb(repo)
+        when :nolocaldb
+          handler.nolocaldb()
+        when :file_mismatch
+          # TODO: Missing pkg_files binding
+          #Pkg.new(event[:event][:file_mismatch][:pkg])
+          #event[:event][:file_mismatch][:file]
+          #event[:event][:file_mismatch][:newsum]
+          #EventHandler.file_mismatch()
+      end
+    end
+
+    def self.install
+      ::Pkg.pkg_event_register(EventHandler::HandleEvent, ::FFI::Pointer::NULL)
+    end
+
+    private
+    #Initialize a dummy handler
+    def self.init
+      h = Handler.new
+      EventHandler.handler = h
+      h
+    end
+
   end
 
   class Pkg
