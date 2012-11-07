@@ -63,14 +63,17 @@ module Pkg
   # void pkg_jobs_free(struct pkg_jobs *jobs);
   attach_function :pkg_jobs_free, [:pointer], :void
 
+  # int pkg_jobs_count(struct pkg_jobs *jobs);
+  attach_function :pkg_jobs_count, [:pointer], :int
+
   # int pkg_jobs_add(struct pkg_jobs *jobs, struct pkg *pkg);
   attach_function :pkg_jobs_add, [:pointer, :pointer], :int
 
   # int pkg_jobs(struct pkg_jobs *jobs, struct pkg **pkg);
   attach_function :pkg_jobs, [:pointer, :pointer], :int
 
-  # int pkg_jobs_apply(struct pkg_jobs *jobs, int force);
-  attach_function :pkg_jobs_apply, [:pointer, :int], :int
+  # int pkg_jobs_apply(struct pkg_jobs *jobs);
+  attach_function :pkg_jobs_apply, [:pointer], :int
 
 
   # typedef int(*pkg_event_cb)(void *, struct pkg_event *);
@@ -377,9 +380,11 @@ module Pkg
       raise "Couldn't add job" if res != Enum::Epkg[:ok]
     end
 
-    def apply(force = false)
-      flags = force ? 1 : 0
-      res = ::Pkg.pkg_jobs_apply(@jobs, flags)
+    def apply()
+      raise "You cannot apply on an Empty job" if ::Pkg.pkg_jobs_count(@jobs) <= 0
+
+      res = ::Pkg.pkg_jobs_apply(@jobs)
+
       raise "Couldn't apply jobs: #{Enum::Epkg[res]}" if res != Enum::Epkg[:ok]
     end
   end
